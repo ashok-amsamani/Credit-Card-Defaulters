@@ -62,7 +62,6 @@ echo "LOAD DATA INPATH '$1/$filenm' OVERWRITE INTO TABLE $2 PARTITION (datadt='$
 
 done
 
-#needed in case if you are using embedded metastore (derby) in /home/hduser/metastore_db
 echo "loading hive table"
 hive -f /tmp/partload.hql
 
