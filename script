@@ -1,5 +1,4 @@
 1. Data Preparation
---------------------
 
 a. Move creditcard_defaulters_pst, creditcard_defaulters_cst and custmaster to /home/hduser/creditcard_insurance/
 b. In mysql
@@ -191,8 +190,31 @@ select penalitymale,penalityfemale
 from T1 inner join T2
 ON 1=1;
 
+OBJECTIVE 3 - DATA GOVERNANCE - MASK DATA and LOAD TO HDFS
+===========================================================
+use insure;
+drop view if exists middlegradeview;
 
+create view middlegradeview as
+select issuerid,businessyear,statedesc,sourcename, sex,grade,marital,newbillamt,defaulter
+,translate(translate(translate(translate(translate(networkurl,'a','x'),'b','y'),'c','z'),'s','r'),'.com','.aaa') as
+maskednetworkurl
+from insuranceorc
+where grade='middle grade'
+and issuerid is not null;
 
+(or)
+
+create view middlegradeview as
+select transform(issuerid,businessyear,statedesc,sourcename, defaulter ,networkurl) using 'python
+/home/hduser/creditcard_insurance/mask_insure.py'
+as (issuerid,businessyear,statedesc,sourcename, defaulter ,maskednetworkurl)
+from insuranceorc
+where grade='middle grade'
+and issuerid is not null;
+select * from middlegradeview;
+
+insert overwrite directory '/user/hduser/defaulterinfo/' row format delimited fields terminated by '|' select * from insure.middlegradeview where defaulter=1;
 
 
 
