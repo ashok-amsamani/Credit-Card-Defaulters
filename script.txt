@@ -28,8 +28,8 @@ c. In Linux sesison
     bash sfm_insuredata.sh https://ashok-amsamani.s3.amazonaws.com/CCDefaulters/insuranceinfo.csv
     #It creates a file at /user/hduser/insurance_clouddata/creditcard_insurance_<today's date>
  
-OBJECTIVE 1 - SPLIT DEFAULTERS AND NON-DEFAULTERS INTO 2 DATA SETS AND LOAD INTO HDFS.
-======================================================================================
+OBJECTIVE 1 - DATA PROCISIONING - SPLIT DEFAULTERS AND NON-DEFAULTERS INTO 2 DATA SETS AND LOAD INTO HDFS.
+==========================================================================================================
  
 2. Sqoop integration with Hive (Merge cst and pst dataset in Hive)
 
@@ -108,8 +108,8 @@ select concat('Trl|', count(1)) as cnt from insure.cstpstpenality where defaulte
 Below is to provision data to different region - sample.
 hadoop distcp -overwrite hdfs://localhost:54310/user/hduser/nondefaultersout/ hdfs://localhost:54310/tmp/promocustomers
 
-OBJECTIVE 2 - CONSOLIDATE ALL INFO IN SINGLE TABLE AND Find MAX PENALTIY FOR MALE AND FEMALE
-=============================================================================================
+OBJECTIVE 2 - DATA CONSOLIDATION - CONSOLIDATE ALL INFO IN SINGLE TABLE AND FIND MAX PENALTIY FOR MALE AND FEMALE
+==================================================================================================================
 
 5. Load S3 data to Hive as partition data.
 
@@ -190,8 +190,10 @@ select penalitymale,penalityfemale
 from T1 inner join T2
 ON 1=1;
 
-OBJECTIVE 3 - DATA GOVERNANCE - MASK DATA and LOAD TO HDFS
-===========================================================
+OBJECTIVE 3 - DATA GOVERNANCE - MASK DATA AND LOAD TO HDFS WITH '|' DELIMITER
+==============================================================================
+9. Mask MiddleGrade data and store.
+
 use insure;
 drop view if exists middlegradeview;
 
@@ -215,6 +217,62 @@ and issuerid is not null;
 select * from middlegradeview;
 
 insert overwrite directory '/user/hduser/defaulterinfo/' row format delimited fields terminated by '|' select * from insure.middlegradeview where defaulter=1;
+
+OBJECTIVE 4 - DATA PROVISIONING - MOVE DATA TO RDBMS WITH VALIDATE
+==================================================================
+
+10. In Mysql - create table
+
+use custdb;
+drop table if exists middlegrade;
+
+create table middlegrade (issuerid integer,businessyear integer,maskedstatedesc varchar(200),maskedsourcename varchar(100), defaulter varchar(20),maskednetworkurl varchar(200));
+
+
+11. export with validate
+
+sqoop export --connect jdbc:mysql://localhost/custdb -username root -password root -table middlegrade -export-dir /user/hduser/defaulterinfo/ --fields-terminated-by '|' -validate
+
+OBJECTIVE 5 - GROUP THE LIKE USERS IN HIVE
+==========================================
+use insure;
+Drop table if exists insuranceorc_collection ;
+
+Create table insuranceorc_collection
+row format delimited collection items terminated by ', '
+stored as orcfile
+location '/user/hduser/insuranceorc_collection/'
+as select issuerid,named_struct('marital',marital,'sex',sex,'grade',grade) as
+personalinfo,collect_set(networkname) as networkname, collect_set(networkurl) networkurl
+from insuranceorc group by issuerid,named_struct('marital',marital,'sex',sex,'grade',grade);
+alter table insuranceorc_collection SET TBLPROPERTIES('EXTERNAL'='TRUE');
+
+Select issuerid,personalinfo.grade,networkname[1],networkurl[1] from insuranceorc_collection where size(networkname)=2 and size(networkurl)=2;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
